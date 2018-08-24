@@ -1,0 +1,14 @@
+{
+    "name": "brain-diminished/xson",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Dorian Savina",
+            "email": "dorian.savina@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^7.1.3"
+    }
+}
