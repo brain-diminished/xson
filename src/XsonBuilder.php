@@ -9,6 +9,10 @@ class XsonBuilder
     private $xson;
     /** @var int */
     private $indentLevel;
+    /** @var object[] */
+    private $stack;
+    /** @var string[] */
+    private $xpath;
 
     public function __construct(int $spaces = -1)
     {
@@ -18,10 +22,12 @@ class XsonBuilder
     public function build($object): string
     {
         $this->indentLevel = 0;
+        $this->stack = [];
+        $this->xpath = [];
         $this->xson = '{';
         $this->indent();
         $this->newLine();
-        $this->writeKey('$');
+        $this->pushKey('$');
         $this->writeMixed($object);
         $this->unindent();
         $this->newLine();
@@ -31,6 +37,11 @@ class XsonBuilder
 
     private function writeMixed($mixed)
     {
+        if (!$this->push($mixed)) {
+            $this->xson .= $this->objectXpath($mixed);
+            return;
+        }
+
         switch (true) {
             case is_scalar($mixed):
                 $this->writeScalar($mixed);
@@ -51,6 +62,8 @@ class XsonBuilder
                 $this->writeObject((array)$mixed);
                 break;
         }
+
+        $this->pop();
     }
 
     private function writeScalar($value)
@@ -94,15 +107,18 @@ class XsonBuilder
 
         $this->indent();
         $this->newLine();
-        $this->writeKey($iterator->key());
+
+        $this->pushKey($iterator->key());
         $this->writeMixed($iterator->current());
+        $this->popKey();
 
         $iterator->next();
         while ($iterator->valid()) {
             $this->xson .= ',';
             $this->newLine();
-            $this->writeKey($iterator->key());
+            $this->pushKey($iterator->key());
             $this->writeMixed($iterator->current());
+            $this->popKey();
             $iterator->next();
         }
         $this->unindent();
@@ -128,9 +144,15 @@ class XsonBuilder
         }
     }
 
-    private function writeKey($key)
+    private function pushKey($key)
     {
+        array_push($this->xpath,  $key);
         $this->xson .= json_encode((string)$key).': ';
+    }
+
+    private function popKey()
+    {
+        array_pop($this->xpath);
     }
 
     private function isEmptyArray(iterable $iterable): bool
@@ -140,6 +162,49 @@ class XsonBuilder
             // TODO: consider specific Dictionary classes
             default: return true;
         }
+    }
+
+    private function objectXpath(object $mixed): string
+    {
+        $xpath = [];
+        $i = 0;
+        foreach ($this->xpath as $loc) {
+            $xpath[] = $loc;
+            if ($this->stack[$i++] === $mixed) {
+                break;
+            }
+        }
+        return $this->xpath($xpath);
+    }
+
+    private function xpath(array $indices): string
+    {
+        $str = "x@$indices[0]";
+        foreach (array_slice($indices, 1) as $index) {
+            if (is_int($index)) {
+                $str .= "[$index]";
+            } else if (preg_match('{^[\w\$^0-9][\w$]*$}', $index)) {
+                $str .= ".$index";
+            } else {
+                $str .= "['".addslashes($index)."']";
+            }
+        }
+        return json_encode($str, JSON_UNESCAPED_UNICODE);
+    }
+
+    private function push($value): bool
+    {
+        if (is_object($value) && in_array($value, $this->stack, true)) {
+            return false;
+        } else {
+            array_push($this->stack, $value);
+            return true;
+        }
+    }
+
+    private function pop()
+    {
+        array_pop($this->stack);
     }
 
     private function getIterator(iterable $iterable): \Iterator
