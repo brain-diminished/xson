@@ -11,9 +11,17 @@
     "require": {
         "php": "^7.1.3"
     },
+    "require-dev": {
+        "phpunit/phpunit": "^7.3"
+    },
     "autoload": {
         "psr-4": {
             "BrainDiminished\\Xson\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "BrainDiminished\\Test\\Xson\\": "tests/"
         }
     }
 }
